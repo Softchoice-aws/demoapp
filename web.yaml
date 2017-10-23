@@ -14,7 +14,7 @@ Parameters:
   PrivateSubnet:
     Description: Deploy Instance in a specific Subnet
     Type: String
-    Default: 	subnet-81d20ae6
+    Default: subnet-81d20ae6
   Ec2SecurityGroup:
     Description: List of Security Groups
     Type: String
