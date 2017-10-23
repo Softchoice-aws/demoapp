@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Template to launch an Amazon Linux instance.
+Parameters:
+  WebSecurityGroup:
+    Type: String
+    Default: sg-3876365e
+    Description: 'Existing security group'
+  InstanceType:
+    Type: String
+    Default: t2.small
+    Description: 'Enter ec2 instance size'
+  KeyName:
+    Type: String
+    Default: jenkins
+    Description:  'Enter the key pair name that you want associated with this instance.'
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-05355a6c
+    us-west-1:
+      AMI: ami-02eada62
+    us-west-2:
+      AMI: ami-0358ce33
+    eu-west-1:
+      AMI: ami-c7c0d6b3
+    sa-east-1:
+      AMI: ami-5253894f
+    ap-southeast-1:
+      AMI: ami-fade91a8
+    ap-southeast-2:
+      AMI: ami-d16bfbeb
+    ap-northeast-1:
+      AMI: ami-39b23d38
+Resources:
+  Ec2Instance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: !FindInMap
+        - RegionMap
+        - !Ref 'AWS::Region'
+        - AMI
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SecurityGroups:
+        - !Ref WebSecurityGroup
+      UserData: !Base64
+        'Fn::Join':
+          - ''
+          - - |
+              #!/bin/bash -v
+            - |
+              # Make certain that cfn itself is up to date
+            - |
+              yum update -y aws-cfn-bootstrap
+            - |
+              # Helper function
+            - |
+              function error_exit
+            - |
+              {
+            - '  /opt/aws/bin/cfn-signal -e 1 -r "$1" '''
+            - !Ref WaitHandle
+            - |
+              '
+            - |2
+                exit 1
+            - |
+              }
+            - |
+              # install and start httpd
+            - |
+              yum install -y httpd || error_exit 'Failed to install Apache'
+            - |
+              /sbin/service httpd start || error_exit 'Failed to start Apache'
+            - >
+              # We got here without issues (except as signaled), so signal
+              success
+            - /opt/aws/bin/cfn-signal -e 0 -r "User data script complete" '
+            - !Ref WaitHandle
+            - |
+              '
+  WaitHandle:
+    Type: 'AWS::CloudFormation::WaitConditionHandle'
+  WaitCondition:
+    Type: 'AWS::CloudFormation::WaitCondition'
+    DependsOn: Ec2Instance
+    Properties:
+      Handle: !Ref WaitHandle
+      Timeout: '300'
+Outputs:
+  InstanceId:
+    Description: Instance ID of the Web Server
+    Value: !Ref Ec2Instance
+  AZ:
+    Description: 'Instances is running in Availability Zone '
+    Value: !GetAtt
+      - Ec2Instance
+      - AvailabilityZone
+  PublicIP:
+    Description: Public IP
+    Value: !GetAtt
+      - Ec2Instance
+      - PublicIp
+  PublicDNS:
+    Description: Instance Public DNS Name
+    Value: !GetAtt
+      - Ec2Instance
+      - PublicDnsName
